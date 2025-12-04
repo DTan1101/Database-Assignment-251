@@ -5,6 +5,9 @@
   - when both provided, thoi_gian_mo < thoi_gian_dong
   - when provided, so_lan_duoc_lam > 0
 */
+USE TutorSS;
+GO
+
 CREATE or ALTER PROCEDURE dbo.InsertQuiz
     @lop_hoc_id INT,
     @ten_quiz NVARCHAR(200),
@@ -46,6 +49,8 @@ GO
 EXEC dbo.InsertQuiz
     @lop_hoc_id = 501,
     @ten_quiz = N'Quiz kiểm tra chương 6',
-    @so_lan_duoc_lam = -1,
+    @so_lan_duoc_lam = 55,
     @thoi_gian_dong = '2025-12-12 23:59:59',
     @thoi_gian_mo = '2025-12-05 08:00:00';
+
+SELECT * FROM [quiz];

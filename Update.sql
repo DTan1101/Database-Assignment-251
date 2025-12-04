@@ -7,6 +7,9 @@ Purpose: Update a quiz's name (primary-key component) and other optional fields 
  - validates thoi_gian_mo < thoi_gian_dong when both provided
  - validates so_lan_duoc_lam > 0 when provided
 */
+USE TutorSS;
+GO
+
 CREATE OR ALTER PROCEDURE dbo.UpdateQuiz
     @lop_hoc_id INT,
     @ten_quiz NVARCHAR(200),
@@ -72,8 +75,8 @@ GO
 
 EXEC dbo.UpdateQuiz
     @lop_hoc_id = 501,
-    @ten_quiz = N'Quiz chương 1',
-    @new_ten_quiz = N'Quiz chương 1 - update',
+    @ten_quiz = N'KT 1 tiết Điện Học',      
+    @new_ten_quiz = N'Quiz chương 1 - update', 
     @so_lan_duoc_lam = 1,
     @thoi_gian_dong = '2025-12-10 23:59:59',
     @thoi_gian_mo = '2025-12-05 08:00:00';

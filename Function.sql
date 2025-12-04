@@ -1,7 +1,8 @@
 -- HÀM 1: THỐNG KÊ HIỆU QUẢ GIA SƯ
 -- Mục đích: Đánh giá hiệu suất gia sư dựa trên nhiều chỉ số
 -- Sử dụng: Cursor, IF/CASE, JOIN, Aggregate functions
-
+USE TutorSS;
+GO
 
 IF OBJECT_ID('dbo.fn_ThongKeHieuQuaGiaSu', 'TF') IS NOT NULL
     DROP FUNCTION dbo.fn_ThongKeHieuQuaGiaSu;
