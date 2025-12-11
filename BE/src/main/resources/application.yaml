@@ -1,0 +1,30 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    # Dùng biến môi trường, nếu không có thì dùng default (chạy local)
+    url: ${SPRING_DATASOURCE_URL:jdbc:sqlserver://localhost:1433;databaseName=TutorSS;encrypt=false;trustServerCertificate=true}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:Admin@123}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+  # Không cho Spring tự chạy script, vì mình dùng script .sql riêng
+  sql:
+    init:
+      mode: never
+
+  mvc:
+    locale: vi_VN
+    locale-resolver: fixed
+
+  # Đảm bảo encoding UTF-8 (nhất là khi trả/nhận JSON tiếng Việt)
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+logging:
+  level:
+    root: INFO
+    org.springframework.jdbc.core: DEBUG   # để thấy SQL khi debug

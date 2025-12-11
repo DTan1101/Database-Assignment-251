@@ -1,0 +1,45 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: AssignmentCSDL-db
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "Admin@123"
+      MSSQL_PID: "Express"
+      MSSQL_COLLATION: "Vietnamese_CI_AS"  # default collation cho tiếng Việt
+    ports:
+      - "1433:1433"
+    volumes:
+      # Lưu data ra ngoài cho khỏi mất khi restart
+      - sqlserver_data:/var/opt/mssql
+      # Mount folder chứa các file .sql của bạn
+      - ./SQLServer:/docker-entrypoint-initdb.d
+      # Mount script init-db.sh
+      - ./init-db.sh:/usr/src/app/init-db.sh
+    command: [ "/bin/bash", "/usr/src/app/init-db.sh" ]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P Admin@123 -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: AssignmentCSDL-app
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:sqlserver://db:1433;databaseName=TutorSS;encrypt=false;trustServerCertificate=true"
+      SPRING_DATASOURCE_USERNAME: "sa"
+      SPRING_DATASOURCE_PASSWORD: "Admin@123"
+    ports:
+      - "8082:8082"
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
