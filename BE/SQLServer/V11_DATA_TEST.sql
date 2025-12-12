@@ -218,3 +218,33 @@ GO
 
 PRINT '=== NẠP DỮ LIỆU TREND PHONG PHÚ THÀNH CÔNG ===';
 GO
+
+PRINT '=== BẮT ĐẦU GÁN 3 HỌC VIÊN (950, 951, 952) VÀO LỚP 520-524 ===';
+
+-- 1. Xóa dữ liệu tham gia cũ (nếu có) của 3 bạn này trong các lớp này
+-- Để tránh lỗi "Trùng khóa chính" nếu chạy script nhiều lần
+DELETE FROM tham_gia
+WHERE hoc_vien_id IN (950, 951, 952)
+  AND lop_hoc_id BETWEEN 520 AND 524;
+
+-- 2. Gán lớp Random
+INSERT INTO tham_gia (lop_hoc_id, hoc_vien_id)
+SELECT
+    ListLop.id_lop,
+    ListHV.id_hv
+FROM
+    -- Danh sách ID lớp (lấy từ ảnh của bạn)
+    (VALUES (520), (521), (522), (523), (524)) AS ListLop(id_lop)
+CROSS JOIN
+    -- Danh sách 3 ID học viên đã có sẵn
+    (VALUES (950), (951), (952)) AS ListHV(id_hv)
+WHERE
+    -- Logic Random:
+    -- CHECKSUM(NEWID()) sinh số ngẫu nhiên.
+    -- % 10 < 7 nghĩa là xác suất ~70% sẽ được gán vào lớp.
+    -- Bạn 950 (Giỏi) sẽ được ưu tiên vào tất cả các lớp để dễ test.
+    (ListHV.id_hv = 950)
+    OR
+    (ABS(CHECKSUM(NEWID())) % 10) < 7;
+
+PRINT '=== GÁN LỚP THÀNH CÔNG ===';

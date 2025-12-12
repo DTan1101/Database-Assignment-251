@@ -1,7 +1,7 @@
 ﻿USE master;
 GO
 
--- 1. XÓA DATABASE CŨ
+-- 1. XÓA DATABASE CŨ NẾU TỒN TẠI
 IF EXISTS (SELECT name FROM sys.databases WHERE name = N'TutorSS')
 BEGIN
     ALTER DATABASE TutorSS SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
@@ -16,15 +16,22 @@ USE TutorSS;
 GO
 
 -- =============================================================
--- PHẦN 1: TẠO BẢNG (SCHEMA) - CÓ RÀNG BUỘC CHECK
+-- PHẦN 1: TẠO BẢNG & RÀNG BUỘC (SCHEMA)
 -- =============================================================
 
 CREATE TABLE [users] (
   [user_id] int PRIMARY KEY,
   [phone] nvarchar(20) UNIQUE NOT NULL,
   [password] nvarchar(255) NOT NULL,
-  -- [MỚI] Ràng buộc độ dài số điện thoại tối thiểu
-  CONSTRAINT CK_Users_Phone CHECK (LEN(phone) >= 9)
+
+  -- [RB] Phone: bắt đầu bằng 0, dài 10-11, chỉ chứa số
+  CONSTRAINT CK_users_phone_format CHECK (
+      [phone] LIKE '0%' AND
+      LEN([phone]) BETWEEN 10 AND 11 AND
+      [phone] NOT LIKE '%[^0-9]%'
+  ),
+  -- [RB] Password: tối thiểu 6 ký tự
+  CONSTRAINT CK_users_password_len CHECK (LEN([password]) >= 6)
 )
 GO
 
@@ -68,8 +75,13 @@ CREATE TABLE [gia_su] (
   [link_facebook] nvarchar(255),
   [tinh_thanh_day] nvarchar(100),
   [so_cccd] nvarchar(50) UNIQUE NOT NULL,
-  -- [MỚI] Ràng buộc ngày sinh phải nhỏ hơn ngày hiện tại (logic cơ bản)
-  CONSTRAINT CK_GiaSu_NgaySinh CHECK (ngay_sinh < GETDATE())
+
+  -- [RB] CCCD: đúng 12 số, không chứa ký tự lạ
+  CONSTRAINT CK_gia_su_cccd_format CHECK (LEN([so_cccd]) = 12 AND [so_cccd] NOT LIKE '%[^0-9]%'),
+  -- [RB] Email: format cơ bản (cho phép NULL)
+  CONSTRAINT CK_gia_su_email_format CHECK ([email] IS NULL OR ([email] LIKE '%_@_%._%')),
+  -- [RB] Ngày sinh: phải nhỏ hơn ngày hiện tại
+  CONSTRAINT CK_gia_su_ngay_sinh_past CHECK ([ngay_sinh] IS NULL OR [ngay_sinh] < CONVERT(date, GETDATE()))
 )
 GO
 
@@ -119,7 +131,7 @@ GO
 CREATE TABLE [hop_dong] (
   [admin_id] int,
   [gia_su_id] int,
-  [thoi_gian_ky] datetime DEFAULT GETDATE(), -- [MỚI] Mặc định lấy ngày hiện tại
+  [thoi_gian_ky] datetime DEFAULT GETDATE(),
   [noi_dung_dieu_khoan] nvarchar(MAX),
   PRIMARY KEY ([admin_id], [gia_su_id], [thoi_gian_ky])
 )
@@ -139,7 +151,10 @@ CREATE TABLE [yeu_cau] (
   [thoi_gian_gui] datetime DEFAULT GETDATE(),
   [trang_thai_xu_ly] nvarchar(100),
   [admin_id] int,
-  PRIMARY KEY ([hoc_vien_id], [phu_huynh_id], [thoi_gian_gui])
+  PRIMARY KEY ([hoc_vien_id], [phu_huynh_id], [thoi_gian_gui]),
+
+  -- [RB] Trạng thái yêu cầu
+  CONSTRAINT CK_yeu_cau_trang_thai CHECK ([trang_thai_xu_ly] IN (N'Chờ xử lý', N'Đang xử lý', N'Đã hoàn thành', N'Từ chối'))
 )
 GO
 
@@ -149,11 +164,15 @@ CREATE TABLE [tin_nhan] (
   [nguoi_nhan_id] int,
   [thoi_gian_gui] datetime DEFAULT GETDATE(),
   [thoi_gian_nhan] datetime,
-  [noi_dung] nvarchar(MAX)
+  [noi_dung] nvarchar(MAX),
+
+  -- [RB] Người gửi khác người nhận
+  CONSTRAINT CK_tin_nhan_sender_receiver CHECK ([nguoi_gui_id] <> [nguoi_nhan_id]),
+  -- [RB] Thời gian nhận >= thời gian gửi
+  CONSTRAINT CK_tin_nhan_time_order CHECK ([thoi_gian_nhan] IS NULL OR [thoi_gian_nhan] >= [thoi_gian_gui])
 )
 GO
 
--- [QUAN TRỌNG] BẢNG LỚP HỌC ĐƯỢC CẬP NHẬT NHIỀU NHẤT
 CREATE TABLE [lop_hoc] (
   [lop_hoc_id] int PRIMARY KEY,
   [admin_id] int,
@@ -166,12 +185,21 @@ CREATE TABLE [lop_hoc] (
   [muc_luong] decimal(18,0),
   [yeu_cau] nvarchar(MAX),
   [so_buoi] int,
-  [thoi_gian_nhan_lop] datetime, -- [MỚI] Đã thêm theo yêu cầu
+  [thoi_gian_nhan_lop] datetime,
 
-  -- [MỚI] Các ràng buộc kiểm tra tính hợp lệ dữ liệu (Validate)
-  CONSTRAINT CK_LopHoc_MucLuong CHECK (muc_luong >= 0),
-  CONSTRAINT CK_LopHoc_SoBuoi CHECK (so_buoi > 0),
-  CONSTRAINT CK_LopHoc_TrangThai CHECK (trang_thai_giao IN (N'Chưa giao', N'Đã giao', N'Đang dạy', N'Đã kết thúc'))
+  -- [RB] Lương > 0
+  CONSTRAINT CK_lop_hoc_salary CHECK ([muc_luong] IS NULL OR [muc_luong] > 0),
+  -- [RB] Số buổi > 0
+  CONSTRAINT CK_lop_hoc_so_buoi CHECK ([so_buoi] IS NULL OR [so_buoi] > 0),
+  -- [RB] Danh sách trạng thái hợp lệ (Gồm cả 4 trạng thái để đảm bảo logic vận hành)
+  CONSTRAINT CK_lop_hoc_trang_thai CHECK ([trang_thai_giao] IN (N'Chưa giao', N'Đã giao', N'Đang dạy', N'Đã kết thúc')),
+  -- [RB] Đồng bộ Logic Trạng thái & Gia sư:
+  -- Nếu 'Chưa giao' -> Gia sư phải NULL
+  -- Nếu 'Đã giao'/'Đang dạy'/'Đã kết thúc' -> Gia sư phải NOT NULL
+  CONSTRAINT CK_lop_hoc_status_tutor CHECK (
+      ([trang_thai_giao] = N'Chưa giao' AND [gia_su_id] IS NULL) OR
+      ([trang_thai_giao] IN (N'Đã giao', N'Đang dạy', N'Đã kết thúc') AND [gia_su_id] IS NOT NULL)
+  )
 )
 GO
 
@@ -202,8 +230,9 @@ CREATE TABLE [thoi_gian_lop_hoc] (
   [gio_bat_dau] time,
   [gio_ket_thuc] time,
   PRIMARY KEY ([lop_hoc_id], [ngay_thu], [gio_bat_dau], [gio_ket_thuc]),
-  -- [MỚI] Giờ kết thúc phải lớn hơn giờ bắt đầu
-  CONSTRAINT CK_ThoiGian_Gio CHECK (gio_ket_thuc > gio_bat_dau)
+
+  -- [RB] Giờ kết thúc phải lớn hơn giờ bắt đầu
+  CONSTRAINT CK_tglh_time_order CHECK ([gio_ket_thuc] > [gio_bat_dau])
 )
 GO
 
@@ -211,12 +240,17 @@ CREATE TABLE [quiz] (
   [lop_hoc_id] int,
   [ten_quiz] nvarchar(100),
   [so_lan_duoc_lam] int,
-  [thoi_gian_dong] datetime,
   [thoi_gian_mo] datetime,
+  [thoi_gian_dong] datetime,
+  [thoi_gian_lam_bai] int,
+
   PRIMARY KEY ([lop_hoc_id], [ten_quiz]),
-  -- [MỚI] Logic thời gian: Mở phải trước Đóng
-  CONSTRAINT CK_Quiz_ThoiGian CHECK (thoi_gian_mo < thoi_gian_dong),
-  CONSTRAINT CK_Quiz_SoLan CHECK (so_lan_duoc_lam > 0)
+  -- [RB] Đóng > Mở
+  CONSTRAINT CK_quiz_time_order CHECK ([thoi_gian_dong] > [thoi_gian_mo]),
+  -- [RB] Số lần làm > 0
+  CONSTRAINT CK_quiz_so_lan CHECK ([so_lan_duoc_lam] > 0),
+  -- [RB] Thời gian làm bài phải <= khoảng thời gian mở (Logic nâng cao từ V00)
+  CONSTRAINT CK_Quiz_WindowFit CHECK ([thoi_gian_lam_bai] <= DATEDIFF(MINUTE, [thoi_gian_mo], [thoi_gian_dong]))
 )
 GO
 
@@ -248,9 +282,11 @@ CREATE TABLE [lich_su_lam_bai] (
   [thoi_gian_bat_dau] datetime,
   [thoi_gian_ket_thuc] datetime,
   [hoc_vien_id] int,
-  -- [MỚI] Điểm số phải trong thang 10
-  CONSTRAINT CK_LichSu_Diem CHECK (diem >= 0 AND diem <= 10),
-  CONSTRAINT CK_LichSu_ThoiGian CHECK (thoi_gian_ket_thuc >= thoi_gian_bat_dau)
+
+  -- [RB] Điểm 0-10
+  CONSTRAINT CK_lslb_diem CHECK ([diem] IS NULL OR ([diem] >= 0 AND [diem] <= 10)),
+  -- [RB] Kết thúc >= Bắt đầu
+  CONSTRAINT CK_lslb_time_order CHECK ([thoi_gian_ket_thuc] IS NULL OR [thoi_gian_ket_thuc] >= [thoi_gian_bat_dau])
 )
 GO
 
@@ -279,11 +315,16 @@ CREATE TABLE [lien_quan] (
   [tai_lieu_goc_id] int,
   [tai_lieu_lien_quan_id] int,
   [mo_ta] nvarchar(MAX),
-  PRIMARY KEY ([tai_lieu_goc_id], [tai_lieu_lien_quan_id])
+  PRIMARY KEY ([tai_lieu_goc_id], [tai_lieu_lien_quan_id]),
+
+  -- [RB] Không liên kết với chính nó
+  CONSTRAINT CK_lien_quan_not_self CHECK ([tai_lieu_goc_id] <> [tai_lieu_lien_quan_id])
 )
 GO
 
--- TẠO KHÓA NGOẠI (GIỮ NGUYÊN - ĐÃ CHUẨN)
+-- =============================================================
+-- PHẦN 2: TẠO KHÓA NGOẠI
+-- =============================================================
 ALTER TABLE [admin] ADD FOREIGN KEY ([admin_id]) REFERENCES [users] ([user_id]);
 ALTER TABLE [phu_huynh] ADD FOREIGN KEY ([phu_huynh_id]) REFERENCES [users] ([user_id]);
 ALTER TABLE [hoc_vien] ADD FOREIGN KEY ([hoc_vien_id]) REFERENCES [users] ([user_id]);

@@ -1,7 +1,12 @@
 USE TutorSS;
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_LayChiTietDiemLopHoc
+IF OBJECT_ID('dbo.sp_LayChiTietDiemLopHoc', 'P') IS NOT NULL
+    DROP PROCEDURE dbo.sp_LayChiTietDiemLopHoc;
+GO
+
+-- 2. Sau đó TẠO MỚI (CREATE) lại từ đầu
+CREATE PROCEDURE dbo.sp_LayChiTietDiemLopHoc
     @MinSoBaiLam INT = 1 -- Chỉ lấy lớp có ít nhất 1 bài kiểm tra
 AS
 BEGIN
@@ -16,8 +21,7 @@ BEGIN
         CAST(AVG(ls.diem) AS DECIMAL(4,2)) AS DiemTrungBinh,
 
         -- Gom tất cả điểm số thành 1 chuỗi, cách nhau bởi dấu phẩy
-        -- Yêu cầu: SQL Server 2017+. Nếu bản cũ hơn phải dùng XML PATH.
-        STRING_AGG(CAST(ls.diem AS VARCHAR), ',') WITHIN GROUP (ORDER BY ls.diem) AS DanhSachDiemRaw
+        STRING_AGG(CAST(ls.diem AS VARCHAR(MAX)), ',') WITHIN GROUP (ORDER BY ls.diem) AS DanhSachDiemRaw
 
     FROM lop_hoc lh
     JOIN day d ON lh.lop_hoc_id = d.lop_hoc_id
@@ -34,7 +38,6 @@ BEGIN
 
     HAVING
         COUNT(ls.id) >= @MinSoBaiLam
-
     ORDER BY
         DiemTrungBinh DESC;
 END;
